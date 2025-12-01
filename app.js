@@ -1,3 +1,9 @@
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/service-worker.js").catch(console.error);
+  });
+}
+
 const defaultWorkouts = {
   A: [
     { id: "ex1", name: "Pressonator", sets: 3, reps: 10, weight: 20 },
