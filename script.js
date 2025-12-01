@@ -196,10 +196,31 @@ function initApp() {
   // Add event listener to complete workout button
   completeWorkoutBtn.addEventListener("click", completeWorkout);
 
-  // Check if app is installed as PWA
-  if (window.matchMedia("(display-mode: standalone)").matches) {
-    console.log("App is running as PWA");
+  // Setup fullscreen app mode detection
+  setupFullscreenMode();
+}
+
+// Setup fullscreen mode detection
+function setupFullscreenMode() {
+  // Check if app is in standalone mode (added to home screen)
+  if (
+    window.matchMedia("(display-mode: standalone)").matches ||
+    window.navigator.standalone === true
+  ) {
+    document.body.classList.add("fullscreen-mode");
+    console.log("App running in fullscreen mode");
   }
+
+  // Listen for display mode changes
+  window
+    .matchMedia("(display-mode: standalone)")
+    .addEventListener("change", (e) => {
+      if (e.matches) {
+        document.body.classList.add("fullscreen-mode");
+      } else {
+        document.body.classList.remove("fullscreen-mode");
+      }
+    });
 }
 
 // Show workout details
@@ -252,6 +273,7 @@ function createExerciseCard(exercise, index) {
   const increaseBtn = card.querySelector(".increase");
   const checkBtn = card.querySelector(".check-btn");
   const setsTracker = card.querySelector(".sets-tracker");
+  const notesTextarea = card.querySelector("textarea");
 
   // Set exercise data
   exerciseName.textContent = exercise.name;
@@ -277,12 +299,14 @@ function createExerciseCard(exercise, index) {
 
   // Add event listeners for weight adjustment
   decreaseBtn.addEventListener("click", () => {
-    let currentWeight = parseInt(weightValue.textContent);
+    let currentWeight = parseFloat(weightValue.textContent);
     if (currentWeight > 0) {
-      currentWeight -= exercise.unit === "kg" ? 2.5 : 5;
-      if (currentWeight < 0) currentWeight = 0;
-      weightValue.textContent = currentWeight;
-      setValueElements[2].textContent = `${currentWeight} ${exercise.unit}`;
+      const decrement = exercise.unit === "kg" ? 2.5 : 5;
+      currentWeight = Math.max(0, currentWeight - decrement);
+      weightValue.textContent = formatWeight(currentWeight);
+      setValueElements[2].textContent = `${formatWeight(currentWeight)} ${
+        exercise.unit
+      }`;
 
       // Save to localStorage
       saveWeightToStorage(exercise.name, currentWeight);
@@ -290,10 +314,13 @@ function createExerciseCard(exercise, index) {
   });
 
   increaseBtn.addEventListener("click", () => {
-    let currentWeight = parseInt(weightValue.textContent);
-    currentWeight += exercise.unit === "kg" ? 2.5 : 5;
-    weightValue.textContent = currentWeight;
-    setValueElements[2].textContent = `${currentWeight} ${exercise.unit}`;
+    let currentWeight = parseFloat(weightValue.textContent);
+    const increment = exercise.unit === "kg" ? 2.5 : 5;
+    currentWeight += increment;
+    weightValue.textContent = formatWeight(currentWeight);
+    setValueElements[2].textContent = `${formatWeight(currentWeight)} ${
+      exercise.unit
+    }`;
 
     // Save to localStorage
     saveWeightToStorage(exercise.name, currentWeight);
@@ -342,11 +369,29 @@ function createExerciseCard(exercise, index) {
   // Load saved weight from localStorage
   const savedWeight = loadWeightFromStorage(exercise.name);
   if (savedWeight !== null) {
-    weightValue.textContent = savedWeight;
-    setValueElements[2].textContent = `${savedWeight} ${exercise.unit}`;
+    weightValue.textContent = formatWeight(savedWeight);
+    setValueElements[2].textContent = `${formatWeight(savedWeight)} ${
+      exercise.unit
+    }`;
   }
 
+  // Load saved notes from localStorage
+  const savedNotes = loadNotesFromStorage(exercise.name);
+  if (savedNotes !== null) {
+    notesTextarea.value = savedNotes;
+  }
+
+  // Save notes when changed
+  notesTextarea.addEventListener("input", () => {
+    saveNotesToStorage(exercise.name, notesTextarea.value);
+  });
+
   return exerciseCard;
+}
+
+// Format weight to remove .0 if integer
+function formatWeight(weight) {
+  return weight % 1 === 0 ? weight.toString() : weight.toFixed(1);
 }
 
 // Hide workout details and show selector
@@ -388,19 +433,18 @@ function loadWeightFromStorage(exerciseName) {
   return weights[exerciseName] !== undefined ? weights[exerciseName] : null;
 }
 
+// Save notes to localStorage
+function saveNotesToStorage(exerciseName, notes) {
+  const allNotes = JSON.parse(localStorage.getItem("gymNotes") || "{}");
+  allNotes[exerciseName] = notes;
+  localStorage.setItem("gymNotes", JSON.stringify(allNotes));
+}
+
+// Load notes from localStorage
+function loadNotesFromStorage(exerciseName) {
+  const allNotes = JSON.parse(localStorage.getItem("gymNotes") || "{}");
+  return allNotes[exerciseName] !== undefined ? allNotes[exerciseName] : null;
+}
+
 // Initialize app when DOM is loaded
 document.addEventListener("DOMContentLoaded", initApp);
-
-// Add PWA support
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker
-      .register("/sw.js")
-      .then((registration) => {
-        console.log("ServiceWorker registration successful");
-      })
-      .catch((err) => {
-        console.log("ServiceWorker registration failed: ", err);
-      });
-  });
-}
