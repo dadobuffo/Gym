@@ -164,6 +164,10 @@ const currentYear = document.getElementById("currentYear");
 // Template for exercise cards
 const exerciseTemplate = document.getElementById("exerciseTemplate");
 
+// State variables
+let currentWorkout = null;
+let isWorkoutView = false;
+
 // Initialize the app
 function initApp() {
   // Set current date
@@ -196,38 +200,39 @@ function initApp() {
   // Add event listener to complete workout button
   completeWorkoutBtn.addEventListener("click", completeWorkout);
 
-  // Setup fullscreen app mode detection
-  setupFullscreenMode();
+  // Handle browser back button
+  window.addEventListener("popstate", handlePopState);
 
-  checkDisplayMode();
-  showMobileInstallPrompt();
+  // Handle initial page load
+  handleInitialLoad();
 
-  // Also check on resize/orientation change
-  window.addEventListener("resize", checkDisplayMode);
-  window.addEventListener("orientationchange", checkDisplayMode);
+  // Listen for Enter key to save inputs
+  document.addEventListener("keydown", (e) => {
+    if (
+      e.key === "Enter" &&
+      document.activeElement.classList.contains("input-field")
+    ) {
+      document.activeElement.blur();
+    }
+  });
 }
 
-// Setup fullscreen mode detection
-function setupFullscreenMode() {
-  // Check if app is in standalone mode (added to home screen)
-  if (
-    window.matchMedia("(display-mode: standalone)").matches ||
-    window.navigator.standalone === true
-  ) {
-    document.body.classList.add("fullscreen-mode");
-    console.log("App running in fullscreen mode");
+// Handle browser back button
+function handlePopState(event) {
+  if (isWorkoutView) {
+    hideWorkout();
   }
+}
 
-  // Listen for display mode changes
-  window
-    .matchMedia("(display-mode: standalone)")
-    .addEventListener("change", (e) => {
-      if (e.matches) {
-        document.body.classList.add("fullscreen-mode");
-      } else {
-        document.body.classList.remove("fullscreen-mode");
-      }
-    });
+// Handle initial page load
+function handleInitialLoad() {
+  const hash = window.location.hash.substring(1);
+
+  if (hash && workoutData[hash]) {
+    showWorkout(hash);
+  } else {
+    history.replaceState({ view: "home" }, "", "#home");
+  }
 }
 
 // Show workout details
@@ -235,6 +240,9 @@ function showWorkout(workoutId) {
   const workout = workoutData[workoutId];
 
   if (!workout) return;
+
+  currentWorkout = workoutId;
+  isWorkoutView = true;
 
   // Update workout header
   workoutTitle.textContent = workout.title;
@@ -260,6 +268,13 @@ function showWorkout(workoutId) {
   workoutSelector.classList.add("hidden");
   workoutDetails.classList.remove("hidden");
 
+  // Add to browser history
+  history.pushState(
+    { workout: workoutId, view: "workout" },
+    "",
+    `#${workoutId}`
+  );
+
   // Scroll to top
   window.scrollTo(0, 0);
 }
@@ -273,247 +288,146 @@ function createExerciseCard(exercise, index) {
   const exerciseCard = card.querySelector(".exercise-card");
   const exerciseName = card.querySelector(".exercise-name");
   const exerciseMuscle = card.querySelector(".exercise-muscle");
-  const setValueElements = card.querySelectorAll(".set-value");
-  const weightValue = card.querySelector(".weight-value");
-  const weightUnit = card.querySelector(".weight-unit");
-  const decreaseBtn = card.querySelector(".decrease");
-  const increaseBtn = card.querySelector(".increase");
-  const checkBtn = card.querySelector(".check-btn");
-  const setsTracker = card.querySelector(".sets-tracker");
+  const setsInput = card.querySelector(".sets-input");
+  const repsInput = card.querySelector(".reps-input");
+  const weightInput = card.querySelector(".weight-input");
   const notesTextarea = card.querySelector("textarea");
 
   // Set exercise data
   exerciseName.textContent = exercise.name;
   exerciseMuscle.textContent = exercise.muscle;
 
-  // Set sets, reps and weight
-  setValueElements[0].textContent = exercise.sets;
-  setValueElements[1].textContent = exercise.reps;
-  setValueElements[2].textContent = `${exercise.weight} ${exercise.unit}`;
+  // Load saved data or use defaults
+  const savedData = loadExerciseData(exercise.name);
 
-  // Set current weight
-  weightValue.textContent = exercise.weight;
-  weightUnit.textContent = exercise.unit;
-
-  // Create set tracker circles
-  setsTracker.innerHTML = "";
-  for (let i = 0; i < exercise.sets; i++) {
-    const setCircle = document.createElement("div");
-    setCircle.classList.add("set-circle");
-    setCircle.dataset.setIndex = i;
-    setsTracker.appendChild(setCircle);
+  if (savedData) {
+    // Use saved data
+    setsInput.value = savedData.sets || exercise.sets;
+    repsInput.value = savedData.reps || exercise.reps;
+    weightInput.value =
+      savedData.weight || `${exercise.weight} ${exercise.unit}`;
+    notesTextarea.value = savedData.notes || "";
+  } else {
+    // Use default data
+    setsInput.value = exercise.sets;
+    repsInput.value = exercise.reps;
+    weightInput.value = `${exercise.weight} ${exercise.unit}`;
   }
 
-  // Add event listeners for weight adjustment
-  decreaseBtn.addEventListener("click", () => {
-    let currentWeight = parseFloat(weightValue.textContent);
-    if (currentWeight > 0) {
-      const decrement = exercise.unit === "kg" ? 2.5 : 5;
-      currentWeight = Math.max(0, currentWeight - decrement);
-      weightValue.textContent = formatWeight(currentWeight);
-      setValueElements[2].textContent = `${formatWeight(currentWeight)} ${
-        exercise.unit
-      }`;
+  // Add event listeners for inputs
+  setsInput.addEventListener("focus", (e) => e.target.select());
+  repsInput.addEventListener("focus", (e) => e.target.select());
+  weightInput.addEventListener("focus", (e) => e.target.select());
 
-      // Save to localStorage
-      saveWeightToStorage(exercise.name, currentWeight);
+  // Save data when input loses focus
+  setsInput.addEventListener("blur", () => saveExerciseData(exercise.name));
+  repsInput.addEventListener("blur", () => saveExerciseData(exercise.name));
+  weightInput.addEventListener("blur", () => saveExerciseData(exercise.name));
+  notesTextarea.addEventListener("input", () =>
+    saveExerciseData(exercise.name)
+  );
+
+  // Also save on Enter key
+  setsInput.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") {
+      saveExerciseData(exercise.name);
+      e.target.blur();
     }
   });
 
-  increaseBtn.addEventListener("click", () => {
-    let currentWeight = parseFloat(weightValue.textContent);
-    const increment = exercise.unit === "kg" ? 2.5 : 5;
-    currentWeight += increment;
-    weightValue.textContent = formatWeight(currentWeight);
-    setValueElements[2].textContent = `${formatWeight(currentWeight)} ${
-      exercise.unit
-    }`;
-
-    // Save to localStorage
-    saveWeightToStorage(exercise.name, currentWeight);
-  });
-
-  // Add event listener for completing sets
-  checkBtn.addEventListener("click", function () {
-    const setCircles = setsTracker.querySelectorAll(".set-circle");
-    let allCompleted = true;
-
-    // Check if all sets are completed
-    setCircles.forEach((circle) => {
-      if (!circle.classList.contains("completed")) {
-        allCompleted = false;
-      }
-    });
-
-    if (allCompleted) {
-      // Reset all sets
-      setCircles.forEach((circle) => {
-        circle.classList.remove("completed");
-      });
-      checkBtn.textContent = "✓";
-      checkBtn.style.backgroundColor = "#2ecc71";
-    } else {
-      // Mark next uncompleted set
-      for (let i = 0; i < setCircles.length; i++) {
-        if (!setCircles[i].classList.contains("completed")) {
-          setCircles[i].classList.add("completed");
-          break;
-        }
-      }
-
-      // Check if now all sets are completed
-      const nowAllCompleted = Array.from(setCircles).every((circle) =>
-        circle.classList.contains("completed")
-      );
-
-      if (nowAllCompleted) {
-        checkBtn.textContent = "Reset";
-        checkBtn.style.backgroundColor = "#e74c3c";
-      }
+  repsInput.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") {
+      saveExerciseData(exercise.name);
+      e.target.blur();
     }
   });
 
-  // Load saved weight from localStorage
-  const savedWeight = loadWeightFromStorage(exercise.name);
-  if (savedWeight !== null) {
-    weightValue.textContent = formatWeight(savedWeight);
-    setValueElements[2].textContent = `${formatWeight(savedWeight)} ${
-      exercise.unit
-    }`;
-  }
-
-  // Load saved notes from localStorage
-  const savedNotes = loadNotesFromStorage(exercise.name);
-  if (savedNotes !== null) {
-    notesTextarea.value = savedNotes;
-  }
-
-  // Save notes when changed
-  notesTextarea.addEventListener("input", () => {
-    saveNotesToStorage(exercise.name, notesTextarea.value);
+  weightInput.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") {
+      saveExerciseData(exercise.name);
+      e.target.blur();
+    }
   });
+
+  // Update total sets when sets input changes
+  setsInput.addEventListener("blur", updateTotalSets);
 
   return exerciseCard;
 }
 
-// Format weight to remove .0 if integer
-function formatWeight(weight) {
-  return weight % 1 === 0 ? weight.toString() : weight.toFixed(1);
+// Save exercise data to localStorage
+function saveExerciseData(exerciseName) {
+  // Find the exercise card
+  const exerciseCards = document.querySelectorAll(".exercise-card");
+
+  exerciseCards.forEach((card) => {
+    const nameElement = card.querySelector(".exercise-name");
+    if (nameElement.textContent === exerciseName) {
+      const setsInput = card.querySelector(".sets-input");
+      const repsInput = card.querySelector(".reps-input");
+      const weightInput = card.querySelector(".weight-input");
+      const notesTextarea = card.querySelector("textarea");
+
+      // Get all exercise data
+      const exerciseData = JSON.parse(
+        localStorage.getItem("workoutData") || "{}"
+      );
+
+      // Update data for this exercise
+      exerciseData[exerciseName] = {
+        sets: setsInput.value,
+        reps: repsInput.value,
+        weight: weightInput.value,
+        notes: notesTextarea.value,
+        lastUpdated: new Date().toISOString(),
+      };
+
+      // Save to localStorage
+      localStorage.setItem("workoutData", JSON.stringify(exerciseData));
+
+      console.log(`Saved data for ${exerciseName}`);
+    }
+  });
+}
+
+// Load exercise data from localStorage
+function loadExerciseData(exerciseName) {
+  const exerciseData = JSON.parse(localStorage.getItem("workoutData") || "{}");
+  return exerciseData[exerciseName] || null;
+}
+
+// Update total sets count
+function updateTotalSets() {
+  if (!isWorkoutView) return;
+
+  let total = 0;
+  const setsInputs = document.querySelectorAll(".sets-input");
+
+  setsInputs.forEach((input) => {
+    const value = parseInt(input.value) || 0;
+    total += value;
+  });
+
+  totalSets.textContent = total;
 }
 
 // Hide workout details and show selector
 function hideWorkout() {
+  isWorkoutView = false;
+  currentWorkout = null;
+
   workoutDetails.classList.add("hidden");
   workoutSelector.classList.remove("hidden");
+
+  // Add home state to history
+  history.pushState({ view: "home" }, "", "#home");
 }
 
 // Complete workout function
 function completeWorkout() {
-  alert("Great job! Workout completed. Keep up the good work!");
-
-  // Reset all set trackers
-  const checkButtons = document.querySelectorAll(".check-btn");
-  checkButtons.forEach((btn) => {
-    btn.textContent = "✓";
-    btn.style.backgroundColor = "#2ecc71";
-  });
-
-  const setCircles = document.querySelectorAll(".set-circle");
-  setCircles.forEach((circle) => {
-    circle.classList.remove("completed");
-  });
-
-  // Go back to workout selector
+  alert("Great job! Workout completed. Your data has been saved.");
   hideWorkout();
-}
-
-// Save weight to localStorage
-function saveWeightToStorage(exerciseName, weight) {
-  const weights = JSON.parse(localStorage.getItem("gymWeights") || "{}");
-  weights[exerciseName] = weight;
-  localStorage.setItem("gymWeights", JSON.stringify(weights));
-}
-
-// Load weight from localStorage
-function loadWeightFromStorage(exerciseName) {
-  const weights = JSON.parse(localStorage.getItem("gymWeights") || "{}");
-  return weights[exerciseName] !== undefined ? weights[exerciseName] : null;
-}
-
-// Save notes to localStorage
-function saveNotesToStorage(exerciseName, notes) {
-  const allNotes = JSON.parse(localStorage.getItem("gymNotes") || "{}");
-  allNotes[exerciseName] = notes;
-  localStorage.setItem("gymNotes", JSON.stringify(allNotes));
-}
-
-// Load notes from localStorage
-function loadNotesFromStorage(exerciseName) {
-  const allNotes = JSON.parse(localStorage.getItem("gymNotes") || "{}");
-  return allNotes[exerciseName] !== undefined ? allNotes[exerciseName] : null;
 }
 
 // Initialize app when DOM is loaded
 document.addEventListener("DOMContentLoaded", initApp);
-
-// Force standalone mode detection
-function checkDisplayMode() {
-  const isStandalone =
-    window.matchMedia("(display-mode: standalone)").matches ||
-    window.navigator.standalone === true ||
-    document.referrer.includes("android-app://");
-
-  if (isStandalone) {
-    document.body.classList.add("fullscreen-mode");
-    console.log("Running in standalone app mode");
-
-    // Hide browser UI on iOS
-    if (window.navigator.standalone) {
-      setTimeout(() => {
-        window.scrollTo(0, 1);
-      }, 100);
-    }
-  }
-
-  return isStandalone;
-}
-
-// Add install prompt for mobile
-function showMobileInstallPrompt() {
-  // Only show on mobile devices
-  if (
-    !/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-      navigator.userAgent
-    )
-  ) {
-    return;
-  }
-
-  // Don't show if already in standalone mode
-  if (checkDisplayMode()) {
-    return;
-  }
-
-  // Show install prompt after 10 seconds
-  setTimeout(() => {
-    const isiOS =
-      /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-    const isAndroid = /Android/.test(navigator.userAgent);
-
-    if (isiOS && window.navigator.standalone === false) {
-      alert(
-        '👆 Per un\'esperienza migliore:\n\n1. Tocca "Condividi" (↑)\n2. Scorri giù\n3. Tocca "Aggiungi a Home"\n\nCosì l\'app si aprirà a schermo intero!'
-      );
-    } else if (isAndroid) {
-      // Check if beforeinstallprompt event is supported
-      if ("onbeforeinstallprompt" in window) {
-        // Chrome will show its own install prompt
-        console.log("Chrome PWA install available");
-      } else {
-        alert(
-          '📱 Per installare l\'app:\n\n1. Menu Chrome (⋮)\n2. "Aggiungi alla schermata Home"\n\nCosì si aprirà a schermo intero!'
-        );
-      }
-    }
-  }, 10000);
-}
