@@ -19,5 +19,5 @@ document.getElementById("back-btn").addEventListener("click", () => {
 
 // PWA
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("service-worker.js");
+  navigator.serviceWorker.register("./service-worker.js");
 }
