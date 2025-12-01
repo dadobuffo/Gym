@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Workout App</title>
+    <title>Workout</title>
     <link rel="stylesheet" href="style.css">
     <link rel="manifest" href="manifest.json">
 </head>
@@ -12,18 +12,18 @@
 <body>
 
     <div id="view-home" class="view active">
-        <h1>Le tue schede</h1>
+        <h1>Your Workouts</h1>
         <div class="container">
-            <button class="card-btn" data-card="A">Scheda A</button>
-            <button class="card-btn" data-card="B">Scheda B</button>
-            <button class="card-btn" data-card="C">Scheda C</button>
+            <button class="card-btn" data-card="A">Workout A</button>
+            <button class="card-btn" data-card="B">Workout B</button>
+            <button class="card-btn" data-card="C">Workout C</button>
         </div>
     </div>
 
     <div id="view-card" class="view">
-        <button id="back-btn">⬅ Torna indietro</button>
+        <button id="back-btn">⬅ Back</button>
         <h2 id="card-title"></h2>
-        <p>(Qui compariranno gli esercizi della scheda)</p>
+        <div id="exercise-list"></div>
     </div>
 
     <script src="app.js"></script>

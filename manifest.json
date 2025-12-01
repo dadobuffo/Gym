@@ -1,5 +1,5 @@
 {
-    "name": "Workout App",
+    "name": "Workout",
     "short_name": "Workout",
     "start_url": "./",
     "display": "standalone",
