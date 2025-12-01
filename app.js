@@ -1,9 +1,20 @@
+// -------------------------
+// REGISTER SERVICE WORKER
+// -------------------------
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/service-worker.js").catch(console.error);
+    navigator.serviceWorker
+      .register("./service-worker.js")
+      .then(() => console.log("Service Worker registered"))
+      .catch((err) =>
+        console.error("Service Worker registration failed:", err)
+      );
   });
 }
 
+// -------------------------
+// DEFAULT WORKOUT DATA
+// -------------------------
 const defaultWorkouts = {
   A: [
     { id: "ex1", name: "Pressonator", sets: 3, reps: 10, weight: 20 },
@@ -19,10 +30,14 @@ const defaultWorkouts = {
   ],
 };
 
+// -------------------------
+// LOAD WORKOUTS FROM LOCALSTORAGE
+// -------------------------
 function loadWorkouts() {
   const data = localStorage.getItem("workouts");
   if (data) return JSON.parse(data);
 
+  // First time: save default workouts
   localStorage.setItem("workouts", JSON.stringify(defaultWorkouts));
   return defaultWorkouts;
 }
@@ -30,6 +45,9 @@ function loadWorkouts() {
 let workouts = loadWorkouts();
 let currentCard = "";
 
+// -------------------------
+// SPA VIEW MANAGEMENT
+// -------------------------
 function showView(viewId) {
   document
     .querySelectorAll(".view")
@@ -37,6 +55,9 @@ function showView(viewId) {
   document.getElementById(viewId).classList.add("active");
 }
 
+// -------------------------
+// EVENT LISTENERS FOR CARD BUTTONS
+// -------------------------
 document.querySelectorAll(".card-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
     currentCard = btn.dataset.card;
@@ -47,10 +68,14 @@ document.querySelectorAll(".card-btn").forEach((btn) => {
   });
 });
 
+// Back button
 document.getElementById("back-btn").addEventListener("click", () => {
   showView("view-home");
 });
 
+// -------------------------
+// RENDER EXERCISES
+// -------------------------
 function renderExercises() {
   const list = document.getElementById("exercise-list");
   list.innerHTML = "";
@@ -67,6 +92,7 @@ function renderExercises() {
     list.appendChild(div);
   });
 
+  // Add change event to inputs
   document.querySelectorAll("#exercise-list input").forEach((input) => {
     input.addEventListener("change", () => {
       const ex = workouts[currentCard].find((x) => x.id === input.dataset.id);
@@ -74,12 +100,4 @@ function renderExercises() {
       localStorage.setItem("workouts", JSON.stringify(workouts));
     });
   });
-}
-
-// PWA service worker
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker
-    .register("./service-worker.js")
-    .then(() => console.log("Service Worker registered"))
-    .catch((err) => console.error("SW error:", err));
 }
