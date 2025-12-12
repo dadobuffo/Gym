@@ -220,3 +220,28 @@ function hideWorkout() {
 }
 
 document.addEventListener("DOMContentLoaded", initApp);
+
+let deferredPrompt;
+
+const installButton = document.getElementById("installButton");
+
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  installButton.classList.remove("hidden");
+
+  installButton.addEventListener("click", installApp);
+});
+
+function installApp() {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then((choiceResult) => {
+      if (choiceResult.outcome === "accepted") {
+        console.log("Utente ha installato la PWA");
+        installButton.classList.add("hidden");
+      }
+      deferredPrompt = null;
+    });
+  }
+}
