@@ -109,7 +109,7 @@ body {
 
   border: none;
   background: transparent;
-
+  cursor: pointer;
   z-index: 1000;
 }
 

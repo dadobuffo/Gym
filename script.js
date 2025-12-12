@@ -12,6 +12,14 @@ let currentWorkout = null;
 let isWorkoutView = false;
 
 async function initApp() {
+  if ("serviceWorker" in navigator) {
+    try {
+      await navigator.serviceWorker.register("sw.js");
+    } catch (error) {
+      // IGNORE ERRORS
+    }
+  }
+
   try {
     const response = await fetch("workout-data.json");
     const data = await response.json();
@@ -25,7 +33,6 @@ async function initApp() {
     handleInitialLoad();
   }
 }
-
 function setupEventListeners() {
   document
     .getElementById("workoutA")
